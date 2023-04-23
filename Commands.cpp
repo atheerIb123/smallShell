@@ -96,24 +96,38 @@ void ChangePromptCommand::execute()
   std::string newP = "smash";
   if(argc <= 1)
   {
-    shell.setPrompt(newP);
+      shell.setPrompt(newP);
   }
   else
   {
-    newP = argv[1];
-    shell.setPrompt(newP);
+      newP = argv[1];
+      shell.setPrompt(newP);
   }
 }
+
 void ShowPidCommand::execute()
 {
-  SmallShell& shell = SmallShell::getInstance();
-  std::cout << "smash pid is " << shell.getSmashPID() << std::endl;
+    SmallShell& shell = SmallShell::getInstance();
+    std::cout << "smash pid is " << shell.getSmashPID() << std::endl;
+}
+
+void GetCurrDirCommand::execute()
+{
+    char* buff = new char[PATH_MAX];
+
+    if(!getcwd(buff, PATH_MAX)) //Get the current directory path
+    {
+        perror("smash error: getcwd failed");
+    }
+
+    std::cout << buff << std::endl;
+    free(buff);
 }
 
 SmallShell::SmallShell() {
-  this->prompt = "smash";
-  this->smashPID = getpid();
-  this->currentJobPID = -1;
+    this->prompt = "smash";
+    this->smashPID = getpid();
+    this->currentJobPID = -1;
 }
 
 SmallShell::~SmallShell() {
@@ -125,20 +139,26 @@ SmallShell::~SmallShell() {
 */
 
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-  if(!cmd_line)
-  {
-    return nullptr;
-  }
-  string cmd_s = _trim(string(cmd_line));
-  string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  if (firstWord.compare("chprompt") == 0)
-  {
-    return new ChangePromptCommand(cmd_line);
-  }
-  else if(firstWord == "showpid")
-  {
-    return new ShowPidCommand(cmd_line);
-  }
+    if(!cmd_line)
+    {
+        return nullptr;
+    }
+    string cmd_s = _trim(string(cmd_line));
+    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+
+    if (firstWord.compare("chprompt") == 0)
+    {
+        return new ChangePromptCommand(cmd_line);
+    }
+    else if(firstWord == "showpid")
+    {
+        return new ShowPidCommand(cmd_line);
+    }
+    else if(firstWord == "pwd")
+    {
+        return new GetCurrDirCommand(cmd_line);
+    }
+
 	// For example:
 /*
   string cmd_s = _trim(string(cmd_line));
@@ -161,16 +181,13 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
-  Command* cmd = CreateCommand(cmd_line);
-  if(cmd_line)
-  {
-    cmd->execute();
-    delete cmd;
-  }
-  // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+    Command* cmd = CreateCommand(cmd_line);
+    
+    if(cmd_line)
+    {
+        cmd->execute();
+        delete cmd;
+    }
 }
 
 

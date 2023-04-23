@@ -78,7 +78,7 @@ class GetCurrDirCommand : public BuiltInCommand {
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
+  ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
@@ -181,6 +181,9 @@ class KillCommand : public BuiltInCommand {
 class SmallShell {
  private:
   // TODO: Add your data members
+  pid_t smashPID;
+  pid_t currentJobPID;
+
   std::string prompt;
   SmallShell();
  public:
@@ -202,8 +205,21 @@ class SmallShell {
   {
       return this->prompt;
   }
+  pid_t getSmashPID()
+  {
+      return this->smashPID;
+  }
+  pid_t getCurrentJobPID()
+  {
+      return this->currentJobPID;
+  }
+  void setCurrentJobPID(pid_t newID)
+  {
+      this->currentJobPID = newID;
+  }
 
-    void executeCommand(const char* cmd_line);
+
+  void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
 };
 

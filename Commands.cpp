@@ -104,9 +104,16 @@ void ChangePromptCommand::execute()
     shell.setPrompt(newP);
   }
 }
+void ShowPidCommand::execute()
+{
+  SmallShell& shell = SmallShell::getInstance();
+  std::cout << "smash pid is " << shell.getSmashPID() << std::endl;
+}
 
 SmallShell::SmallShell() {
   this->prompt = "smash";
+  this->smashPID = getpid();
+  this->currentJobPID = -1;
 }
 
 SmallShell::~SmallShell() {
@@ -127,8 +134,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   if (firstWord.compare("chprompt") == 0)
   {
     return new ChangePromptCommand(cmd_line);
-
-
+  }
+  else if(firstWord == "showpid")
+  {
+    return new ShowPidCommand(cmd_line);
   }
 	// For example:
 /*

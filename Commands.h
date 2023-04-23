@@ -8,16 +8,16 @@
 
 class Command {
 // TODO: Add your data members
- public:
+public:
     const char* cmd_line;
     char** argv;
     int argc;
-  Command(const char* cmd_line);
-  virtual ~Command(){delete[] argv;}
-  virtual void execute() = 0;
-  //virtual void prepare();
-  //virtual void cleanup();
-  // TODO: Add your extra methods if needed
+    Command(const char* cmd_line) : cmd_line(cmd_line){}
+    virtual ~Command(){delete[] argv;}
+    virtual void execute() = 0;
+    //virtual void prepare();
+    // virtual void cleanup();
+    // TODO: Add your extra methods if needed
 };
 
 class BuiltInCommand : public Command {
@@ -106,47 +106,72 @@ public:
 
 
 class JobsList {
- public:
-  class JobEntry {
-   // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  JobsList();
-  ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
-  void printJobsList();
-  void killAllJobs();
-  void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
-  void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
-  // TODO: Add extra methods or modify exisitng ones as needed
+public:
+    class JobEntry{
+    public:
+        int job_id;
+        pid_t pid;
+        time_t elapsed_time;
+        bool is_stopped;
+        Command* command;
+
+        JobEntry(int jobID, pid_t pid, bool isStopped, Command* cmd) : job_id(jobID), pid(pid), elapsed_time(time(nullptr)), is_stopped(isStopped), command(cmd) {}
+        JobEntry& operator=(const JobEntry& job_entry) = default;
+        JobEntry(const JobEntry& other) = default;
+        ~JobEntry() = default;
+
+        bool operator<(const JobsList::JobEntry& job) const { return (this->job_id < job.job_id); }
+        bool operator>(const JobsList::JobEntry& job) const { return (this->job_id > job.job_id); }
+        bool operator==(const JobsList::JobEntry& job) const { return (this->job_id == job.job_id); }
+    };
+
+    JobsList() = default;
+    JobsList(const JobsList& other) = default;
+    JobsList& operator=(const JobsList& job_list) = default;
+    ~JobsList() = default;
+
+    void addJob(Command* cmd, pid_t pid, bool isStopped);
+    void printJobsList();
+    void killAllJobs();
+    void removeFinishedJobs();
+    void finishedJobs();
+    JobEntry* getJobById(int jobId);
+    JobEntry* getJobByPID(int jobPID);
+    void removeJobById(int jobId);
+    int getMaxJobID();
+    JobEntry* getLastJob(int* lastJobId);
+    JobEntry* getLastStoppedJob(int *jobId);
+    std::vector<JobEntry*> getJobs() { return jobs; }
+private:
+    std::vector<JobEntry*> jobs;
+    int jobCounter = 0;
 };
 
 class JobsCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~JobsCommand() {}
-  void execute() override;
+private:
+    JobsList* jobs;
+public:
+    JobsCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
+    virtual ~JobsCommand() {}
+    void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~ForegroundCommand() {}
-  void execute() override;
+private:
+    JobsList* foregroundJobs;
+public:
+    ForegroundCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), foregroundJobs(jobs){}
+    virtual ~ForegroundCommand() {}
+    void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~BackgroundCommand() {}
-  void execute() override;
+private:
+    JobsList* backgroundJobs;
+public:
+    BackgroundCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), backgroundJobs(jobs) {}
+    virtual ~BackgroundCommand() {}
+    void execute() override;
 };
 
 class TimeoutCommand : public BuiltInCommand {
@@ -233,6 +258,7 @@ public:
 
     void executeCommand(const char* cmd_line);
     char** last_dir_path; //for CD
+    JobsList jobs;
 };
 
 #endif //SMASH_COMMAND_H_

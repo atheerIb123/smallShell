@@ -6,6 +6,8 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <fcntl.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -176,6 +178,162 @@ void ChangeDirCommand::execute()
     *(SmallShell::getInstance().last_dir_path) = buf;
 }
 
+void JobsCommand::execute()
+{
+    jobs->removeFinishedJobs();
+    jobs->printJobsList();
+}
+
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped)
+{
+    removeFinishedJobs();
+    JobEntry* job = new JobEntry(getMaxJobID() + 1, pid, isStopped, cmd);
+    jobs.push_back(job);
+}
+
+static bool jobsSort(JobsList::JobEntry* job1, JobsList::JobEntry* job2) { return (*job1 < *job2); }
+
+void JobsList::printJobsList() {
+    std::sort(jobs.begin(), jobs.end(), jobsSort); //Sort the jobs by id
+
+    for (JobEntry* job:jobs) {
+        if (job->is_stopped) {
+            std::cout << "[" << job->job_id << "] " << job->command->cmd_line << " : " << job->pid << " " <<
+                      (int) difftime(time(nullptr), job->elapsed_time) << " secs (stopped)" << std::endl;
+        }
+        else {
+            std::cout << "[" << job->job_id << "] " << job->command->cmd_line << " : " << job->pid << " " <<
+                      (int) difftime(time(nullptr), job->elapsed_time) << " secs" << std::endl;
+        }
+    }
+}
+
+void JobsList::removeFinishedJobs()
+{
+    int index = 0;
+
+    for (JobEntry* job:jobs) {
+        int waitResult = waitpid(job->pid, nullptr, WNOHANG);
+        if (waitResult != 0) {
+            jobs.erase(jobs.begin() + index);
+        }
+        index++;
+    }
+}
+
+void JobsList::finishedJobs() {
+    SmallShell& shell = SmallShell::getInstance();
+    pid_t pid_smash = getpid();
+
+    if(pid_smash < 0) {
+        std::perror("smash error: getpid failed");
+        return;
+    }
+
+    if(pid_smash != shell.getSmashPID()){
+        return;
+    }
+
+    for(unsigned int i = 0; i < jobs.size(); i++)
+    {
+        JobsList::JobEntry* job = jobs[i];
+        int waitStatus = waitpid(job->pid, nullptr, WNOHANG);
+        if(waitStatus != 0) {
+            jobs.erase(jobs.begin() + i);
+        }
+    }
+
+    if(jobs.empty()) {
+        jobCounter = 0;
+    }
+    else {
+        jobCounter = jobs.back()->pid;
+    }
+}
+
+JobsList::JobEntry *JobsList::getJobById(int jobId) {
+    for (JobEntry* job:jobs) {
+        if (job->job_id == jobId) {
+            return job;
+        }
+    }
+
+    return nullptr;
+}
+
+JobsList::JobEntry *JobsList::getJobByPID(int jobPID) {
+    for (JobEntry* job:jobs) {
+        if (job->pid == jobPID) {
+            return job;
+        }
+    }
+
+    return nullptr;
+}
+
+void JobsList::removeJobById(int jobId) {
+    for (auto it = jobs.begin(); it != jobs.end(); it++) {
+        if ((*it)->job_id == jobId) {
+            jobs.erase(it);
+            return;
+        }
+    }
+}
+
+void JobsList::killAllJobs()
+{
+    removeFinishedJobs();
+
+    for (JobEntry* job:jobs) {
+        if (kill(job->pid, SIGKILL) == -1) {
+            perror("smash error: kill failed");
+            return;
+        }
+    }
+
+    if (!jobs.empty())
+    {
+        jobs.clear();
+    }
+
+    removeFinishedJobs();
+}
+
+int JobsList::getMaxJobID() {
+    int maxID = 0;
+    for (JobEntry* job:jobs) {
+        if (job->job_id > maxID) {
+            maxID = job->job_id;
+        }
+    }
+
+    return maxID;
+}
+
+JobsList::JobEntry* JobsList::getLastJob(int *lastJobId) {
+    if (jobs.empty() || !lastJobId) {
+        return nullptr;
+    }
+    *lastJobId = getMaxJobID();
+    return getJobById(*lastJobId);
+}
+
+JobsList::JobEntry *JobsList::getLastStoppedJob(int *jobId) {
+    int index = 0, maxID = 0;
+    JobEntry* lastStoppedJob = nullptr;
+
+    for (JobEntry* job:jobs) {
+        if ((job->job_id > maxID) && job->is_stopped) {
+            maxID = job->job_id;
+            lastStoppedJob = job;
+        }
+    }
+
+    *jobId = maxID;
+
+    return lastStoppedJob;
+}
+
 SmallShell::SmallShell() {
     this->prompt = "smash";
     this->smashPID = getpid();
@@ -217,6 +375,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if(firstWord == "cd")
     {
         return new ChangeDirCommand(cmd_line, last_dir_path);
+    }
+    else if(firstWord == "jobs")
+    {
+        return new JobsCommand(cmd_line, &jobs);
     }
 	// For example:
 /*

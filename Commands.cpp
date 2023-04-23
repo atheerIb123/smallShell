@@ -124,14 +124,70 @@ void GetCurrDirCommand::execute()
     free(buff);
 }
 
+void ChangeDirCommand::execute()
+{
+    if(argc > 2)
+    {
+        std::cerr << "smash error: cd: too many arguments" << std::endl;
+        return;
+    }
+
+    char* buf = new char[FILENAME_MAX];
+    char* lastDir = *(SmallShell::getInstance().last_dir_path);
+
+    if(!strcmp(argv[1], "-"))
+    {
+        if(lastDir == nullptr)
+        {
+            std::cerr << "smash error: cd: OLDPWD not set" << std::endl;
+            return;
+        }
+
+        //now we set the current dir to be the last one
+        if(!getcwd(buf, FILENAME_MAX))
+        {
+            perror("smash error: getcwd failed");
+            return;
+        }
+
+        if(chdir(lastDir) < 0)
+        {
+            perror("smash error: chdir failed");
+            return;
+        }
+    }
+    else
+    {
+        if(!getcwd(buf, FILENAME_MAX))
+        {
+            perror("smash error: chdir failed");
+            return;
+        }
+
+        if(chdir(argv[1]) < 0)
+        {
+            perror("smash error: chdir failed");
+            return;
+        }
+    }
+
+    delete[] SmallShell::getInstance().last_dir_path;
+    SmallShell::getInstance().last_dir_path = new char *[FILENAME_MAX];
+    *(SmallShell::getInstance().last_dir_path) = buf;
+}
+
 SmallShell::SmallShell() {
     this->prompt = "smash";
     this->smashPID = getpid();
     this->currentJobPID = -1;
+    this->last_dir_path = new char *[FILENAME_MAX];
+    *this->last_dir_path = nullptr;
+
 }
 
-SmallShell::~SmallShell() {
-// TODO: add your implementation
+SmallShell::~SmallShell()
+{
+    delete[] last_dir_path;
 }
 
 /**
@@ -158,7 +214,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new GetCurrDirCommand(cmd_line);
     }
-
+    else if(firstWord == "cd")
+    {
+        return new ChangeDirCommand(cmd_line, last_dir_path);
+    }
 	// For example:
 /*
   string cmd_s = _trim(string(cmd_line));

@@ -63,10 +63,22 @@ public:
 
 
 class ChangeDirCommand : public BuiltInCommand {
-// TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
-  virtual ~ChangeDirCommand() {}
-  void execute() override;
+// TODO: Add your data members
+private:
+    char* currentDir;
+    char** lastDirPath;
+public:
+    ChangeDirCommand(const char* cmd_line, char** plastPwd): BuiltInCommand(cmd_line), lastDirPath(plastPwd)
+    {
+        this->currentDir = new char[FILENAME_MAX];
+    }
+
+    virtual ~ChangeDirCommand()
+    {
+        delete[] this->currentDir;
+    }
+
+    void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
@@ -179,48 +191,48 @@ class KillCommand : public BuiltInCommand {
 };
 
 class SmallShell {
- private:
-  // TODO: Add your data members
-  pid_t smashPID;
-  pid_t currentJobPID;
+private:
+    pid_t smashPID; //for showPID
+    pid_t currentJobPID;
 
-  std::string prompt;
-  SmallShell();
- public:
-  Command *CreateCommand(const char* cmd_line);
-  SmallShell(SmallShell const&)      = delete; // disable copy ctor
-  void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
-  {
-    static SmallShell instance; // Guaranteed to be destroyed.
-    // Instantiated on first use.
-    return instance;
-  }
-  ~SmallShell();
-  void setPrompt(std::string& newPrompt)
-  {
-      this->prompt = newPrompt;
-  }
-  std::string& getPrompt()
-  {
-      return this->prompt;
-  }
-  pid_t getSmashPID()
-  {
-      return this->smashPID;
-  }
-  pid_t getCurrentJobPID()
-  {
-      return this->currentJobPID;
-  }
-  void setCurrentJobPID(pid_t newID)
-  {
-      this->currentJobPID = newID;
-  }
+    std::string prompt; //for chprompt
+    SmallShell();
+
+public:
+    Command *CreateCommand(const char* cmd_line);
+    SmallShell(SmallShell const&)      = delete; // disable copy ctor
+    void operator=(SmallShell const&)  = delete; // disable = operator
+    static SmallShell& getInstance() // make SmallShell singleton
+    {
+        static SmallShell instance; // Guaranteed to be destroyed.
+        // Instantiated on first use.
+        return instance;
+    }
+    ~SmallShell();
+    void setPrompt(std::string& newPrompt)
+    {
+        this->prompt = newPrompt;
+    }
+    std::string& getPrompt()
+    {
+        return this->prompt;
+    }
+    pid_t getSmashPID()
+    {
+        return this->smashPID;
+    }
+    pid_t getCurrentJobPID()
+    {
+        return this->currentJobPID;
+    }
+    void setCurrentJobPID(pid_t newID)
+    {
+        this->currentJobPID = newID;
+    }
 
 
-  void executeCommand(const char* cmd_line);
-  // TODO: add extra methods as needed
+    void executeCommand(const char* cmd_line);
+    char** last_dir_path; //for CD
 };
 
 #endif //SMASH_COMMAND_H_

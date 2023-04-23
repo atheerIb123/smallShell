@@ -113,9 +113,9 @@ void ShowPidCommand::execute()
 
 void GetCurrDirCommand::execute()
 {
-    char* buff = new char[PATH_MAX];
+    char* buff = new char[FILENAME_MAX];
 
-    if(!getcwd(buff, PATH_MAX)) //Get the current directory path
+    if(!getcwd(buff, FILENAME_MAX)) //Get the current directory path
     {
         perror("smash error: getcwd failed");
     }
@@ -182,7 +182,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
     Command* cmd = CreateCommand(cmd_line);
-    
+
     if(cmd_line)
     {
         cmd->execute();

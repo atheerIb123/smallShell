@@ -280,7 +280,34 @@ void BackgroundCommand::execute()
         }
 
         job = backgroundJobs->getJobById(jobId);
-        
+        if(job == nullptr)
+        {
+            std::cerr << "smash error: fg: job-id " << jobId << " does not exist" << std::endl;
+            return;
+        }
+        if(!job->is_stopped)
+        {
+            std::cerr << "smash error: bg: job-id" << jobId << "is already running in the background" << std::endl;
+            return;
+        }
+    }
+    else if(argc == 1)
+    {
+        job = backgroundJobs->getLastStoppedJob(&jobId);
+        if(!job)
+        {
+            std::cerr << "smash error: bg: there is no stopped jobs to resume" << std::endl;
+            return;
+        }
+    }
+    job->is_stopped = false;
+    std::cout << job->command->cmd_line << " : " << job->pid << std::endl;
+    int killSYSCALL_res = kill(job->pid, SIGCONT);
+
+    if(killSYSCALL_res == -1)//the syscall failed
+    {
+        std::perror("smash error: kill failed");
+        return;
     }
 }
 void JobsCommand::execute()
@@ -519,5 +546,4 @@ void SmallShell::executeCommand(const char *cmd_line) {
         delete cmd;
     }
 }
-
 

@@ -422,6 +422,91 @@ bool KillCommand::validArguments()
 
 }
 
+
+static bool isComplex(std::string cmd_line)
+{
+    return ((cmd_line.find('*') != std::string::npos) || (cmd_line.find('?') != std::string::npos));
+}
+
+//special execution :)
+void ExternalCommand::execute()
+{
+    SmallShell& shell = SmallShell::getInstance();
+    pid_t pid = fork();
+
+    if(pid == -1)
+    {
+        std::perror("smash error: fork failed");
+        return;
+    }
+
+    if(pid == 0) //child
+    {
+        if(setpgrp() == -1)
+        {
+            std::perror("smash error: setpgrp failed");
+            return;
+        }
+
+        char destination[COMMAND_ARGS_MAX_LENGTH + 1];
+
+        strcpy(destination, cmd_line);
+
+        if(isComplex(std::string(cmd_line)))
+        {
+            char *arg[] = {(char *) "/bin/bash", (char *) "-c", destination, nullptr};
+
+            if (execv("/bin/bash", arg) == -1)
+            {
+                std::perror("smash error: execv failed");
+                return;
+            }
+
+        }
+        else
+        {
+
+            if(isBg)
+            {
+                _removeBackgroundSign(destination);
+            }
+
+            char* args[COMMAND_ARGS_MAX_LENGTH + 1] = {nullptr};
+            _parseCommandLine(destination, args);
+
+            if(execv(args[0], args) == -1)
+            {
+                std::perror("smash error: execvp failed");
+                return;
+            }
+
+        }
+    }
+    else //father
+    {
+
+        if(!isBg)
+        {
+            shell.setCurrentJobPID(pid);
+            shell.setCurrentCommandLine(std::string(cmd_line));
+
+            if(waitpid(pid, nullptr, WUNTRACED) == -1)
+            {
+                std::perror("smash error: waitpid failed");
+                return;
+            }
+
+        }
+        else
+        {
+            ExternalCommand* exCmd = new ExternalCommand(this->cmd_line, jobs, isBg);
+            jobs->addJob(exCmd, pid, false);
+        }
+
+    }
+}
+
+
 void JobsCommand::execute()
 {
     jobs->removeFinishedJobs();
@@ -637,6 +722,17 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new QuitCommand(cmd_line, &this->jobs);
     }
 
+
+
+
+
+
+
+    else
+    {
+        bool isBg = _isBackgroundComamnd(cmd_line);
+        return new ExternalCommand(cmd_line, &jobs, isBg);
+    }
 	// For example:
 /*
   string cmd_s = _trim(string(cmd_line));

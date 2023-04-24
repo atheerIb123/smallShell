@@ -97,9 +97,10 @@ public:
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
-// TODO: Add your data members
+private:
+    JobsList* jobs;
 public:
-    QuitCommand(const char* cmd_line, JobsList* jobs);
+    QuitCommand(const char* cmd_line, JobsList* jobs) :BuiltInCommand(cmd_line),jobs(jobs){}
     virtual ~QuitCommand() {}
     void execute() override;
 };
@@ -209,10 +210,13 @@ public:
 
 class KillCommand : public BuiltInCommand {
     // TODO: Add your data members
+private:
+    JobsList* jobs;
 public:
-    KillCommand(const char* cmd_line, JobsList* jobs);
+    KillCommand(const char* cmd_line, JobsList* jobs):BuiltInCommand(cmd_line), jobs(jobs){}
     virtual ~KillCommand() {}
     void execute() override;
+    bool validArguments();
 };
 
 class SmallShell {

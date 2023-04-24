@@ -221,6 +221,7 @@ private:
     pid_t currentJobPID;
 
     std::string prompt; //for chprompt
+    std::string currentCommandLine;
     SmallShell();
 
 public:
@@ -255,6 +256,10 @@ public:
         this->currentJobPID = newID;
     }
 
+    void setCurrentCommandLine(std::string cmd_line)
+    {
+        this->currentCommandLine = cmd_line;
+    }
 
     void executeCommand(const char* cmd_line);
     char** last_dir_path; //for CD

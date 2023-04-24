@@ -178,6 +178,111 @@ void ChangeDirCommand::execute()
     *(SmallShell::getInstance().last_dir_path) = buf;
 }
 
+void ForegroundCommand::execute()
+{
+    foregroundJobs->removeFinishedJobs();
+    SmallShell& shell = SmallShell::getInstance();
+    int jobId;
+
+    if(argc > 2)
+    {
+        std::cerr << "smash error: fg: invalid arguments" << std::endl;
+        return;
+    }
+
+   if(argc == 1) //No PID supported
+   {
+       jobId = this->foregroundJobs->getMaxJobID();
+   }
+   else if(argc == 2)
+   {
+       jobId = stoi(argv[1]);
+
+       if(jobId == 0)
+       {
+           std::cerr << "smash error: fg: job-id " << 0 << " does not exist" << std::endl;
+           return;
+       }
+
+       if(!jobId)
+       {
+           std::cerr << "smash error: fg: invalid arguments" << std::endl;
+           return;
+       }
+   }
+
+   if(foregroundJobs->getJobs().empty())
+   {
+       std::cerr << "smash error: fg: jobs list is empty" << std::endl;
+       return;
+   }
+
+   JobsList::JobEntry* job = foregroundJobs->getJobById(jobId);
+
+   if(job == nullptr)
+   {
+       std::cerr << "smash error: fg: job-id " << jobId << " does not exist" << std::endl;
+       return;
+   }
+
+   if(job->is_stopped)
+   {
+       int killSYSCALL_res = kill(job->pid, SIGCONT);
+
+       if(killSYSCALL_res == -1)//the syscall failed
+       {
+           std::perror("smash error: kill failed");
+           return;
+       }
+   }
+
+   std::cout << job->command->cmd_line << " : " << job->pid << std::endl;
+   shell.setCurrentJobPID(job->pid);
+   shell.setCurrentCommandLine(std::string(job->command->cmd_line));
+
+   int status;
+
+   if(waitpid(job->pid, &status, WUNTRACED) == -1)
+   {
+       std:perror("smash error: waitpid failed");
+       return;
+   }
+}
+
+void BackgroundCommand::execute()
+{
+    this->backgroundJobs->removeFinishedJobs();
+    SmallShell& shell = SmallShell::getInstance();
+    int jobId;
+
+    if(argc > 2)
+    {
+        std::cerr << "smash error: bg: invalid arguments" << std::endl;
+        return;
+    }
+
+    JobsList::JobEntry* job = nullptr;
+
+    if(argc == 2)
+    {
+        jobId = stoi(argv[1]);
+
+        if(jobId == 0)
+        {
+            std::cerr << "smash error: bg: job-id " << 0 << " does not exist" << std::endl;
+            return;
+        }
+
+        if(!jobId)
+        {
+            std::cerr << "smash error: bg: invalid arguments" << std::endl;
+            return;
+        }
+
+        job = backgroundJobs->getJobById(jobId);
+        
+    }
+}
 void JobsCommand::execute()
 {
     jobs->removeFinishedJobs();
@@ -379,6 +484,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if(firstWord == "jobs")
     {
         return new JobsCommand(cmd_line, &jobs);
+    }
+    else if(firstWord == "fg")
+    {
+        return new ForegroundCommand(cmd_line, &this->jobs);
     }
 	// For example:
 /*

@@ -26,9 +26,13 @@ public:
     virtual ~BuiltInCommand() {}
 };
 
+class JobsList;
 class ExternalCommand : public Command {
+private:
+    JobsList* jobs;
+    bool isBg;
 public:
-    ExternalCommand(const char* cmd_line);
+    ExternalCommand(const char* cmd_line, JobsList* jobs, bool isBg):Command(cmd_line), jobs(jobs), isBg(isBg){}
     virtual ~ExternalCommand() {}
     void execute() override;
 };

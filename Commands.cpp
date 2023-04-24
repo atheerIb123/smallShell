@@ -310,6 +310,118 @@ void BackgroundCommand::execute()
         return;
     }
 }
+
+void QuitCommand::execute()
+{
+    if(argc > 1 && argv[1] == "kill")
+    {
+        std::cout << "smash: sending SIGKILL signal to " << jobs->getJobs().size() << " jobs:" << std::endl;
+
+        for (JobsList::JobEntry* job : jobs->getJobs())
+        {
+            std::cout << job->pid << ": " << job->command->cmd_line << std::endl;
+        }
+
+        jobs->killAllJobs();
+    }
+
+    exit(0);
+}
+void KillCommand::execute()
+{
+    if (!validArguments())
+    {
+        return;
+    }
+
+    int id = stoi(argv[2]);
+    int sigNum = stoi(argv[1]);
+    sigNum = -sigNum;//check
+
+    JobsList::JobEntry* job = jobs->getJobById(id);
+
+    if (!job)
+    {
+        cerr << "smash error: kill: job-id " <<  job->job_id << " does not exist" << endl;
+        return;
+    }
+
+    if (kill(job->pid, sigNum) == -1)
+    {
+        std::perror("smash error: kill failed");
+    }
+    else
+    {
+        std::cout << "signal number " << sigNum << " was sent to pid " << job->pid << std::endl;
+    }
+
+}
+
+bool KillCommand::validArguments()
+{
+//check
+    if (argv[1] == nullptr || argv[2] == nullptr || argv[1][0] != '-' ||
+        argv[1][1] < '0' || argv[1][1] > '9' || argv[3] != nullptr)
+    {
+        cerr << "smash error: kill: invalid arguments" << endl;
+        return false;
+    }
+    int i = 2;
+    while (argv[1][i] != '\0') //make sure the sig is a number
+    {
+        if (argv[1][i] < '0' || argv[1][i] > '9')
+        {
+            cerr << "smash error: kill: invalid arguments" << endl;
+            return false;
+        }
+        i++;
+    }
+    i = 0;
+    if (argv[2][0] == '\0')
+    {
+        cerr << "smash error: kill: invalid arguments" << endl;
+        return false;
+    }
+
+    if (argv[2][0] == '-')
+    {
+        i = 1;
+    }
+
+    while (argv[2][i] != '\0') //make sure the pid is a number
+    {
+
+        if (argv[2][i] < '0' || argv[2][i] > '9')
+        {
+            cerr << "smash error: kill: invalid arguments" << endl;
+            return false;
+        }
+
+        i++;
+
+    }
+
+    i = 1;
+    int num = 0;
+    if(argv[2] != nullptr)
+    {
+        while(argv[2][i] != '\0')
+        {
+            num = 10*num + argv[1][i++] - '0';
+        }
+    }
+
+
+    if (argv[2][0] == '-')
+    {
+        cerr << "smash error: kill: job-id -" << num << " does not exist" << endl;
+        return false;
+    }
+
+    return true;
+
+}
+
 void JobsCommand::execute()
 {
     jobs->removeFinishedJobs();
@@ -516,6 +628,15 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new ForegroundCommand(cmd_line, &this->jobs);
     }
+    else if(firstWord == "bg")
+    {
+        return new BackgroundCommand(cmd_line, &this->jobs);
+    }
+    else if(firstWord == "quit")
+    {
+        return new QuitCommand(cmd_line, &this->jobs);
+    }
+
 	// For example:
 /*
   string cmd_s = _trim(string(cmd_line));

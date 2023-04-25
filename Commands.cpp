@@ -507,6 +507,168 @@ void ExternalCommand::execute()
 }
 
 
+void RedirectionCommand::getData(std::string cmd) {
+    if (cmd.empty())
+    {
+        return;
+    }
+
+    if(cmd.find(">>") != -1)
+    {
+        isAppend = true;
+    }
+    else
+    {
+        isAppend = false;
+    }
+
+    /*int i = 0;
+    while(cmd[i] != '>')
+    {
+        i++;
+    }*/
+
+    int beginPos = cmd.find(">");
+    int i = beginPos;
+    if(isAppend)
+    {
+        beginPos += 2;
+    }
+    else
+    {
+        beginPos += 1;
+    }
+
+    string path_temp = cmd.substr(beginPos, cmd.size() - beginPos + 1);
+    string command_temp = cmd.substr(0,i);
+
+    destination = _trim(path_temp);
+    this->currentCmd = _trim(command_temp);
+}
+
+
+
+
+
+void RedirectionCommand::prepare()
+{
+    getData(cmd_line);
+    dupStdOut = dup(1);
+
+    if(dupStdOut == -1)
+    {
+        std::perror("smash error: dup failed");
+        return;
+    }
+
+    if(close(1) == -1)
+    {
+        close(dupStdOut);
+        std::perror("smash error: close failed");
+        return;
+    }
+
+    int currentFD = -1;
+
+    if(isAppend)
+    {
+        currentFD = open(destination.c_str(), O_CREAT|O_RDWR|O_APPEND, 0655);
+        if(currentFD == -1)
+        {
+
+            if(dup2(dupStdOut, 1) == -1)
+            {
+                std::perror("smash error: dup2 failed");
+                return;
+            }
+
+            if(close(dupStdOut) == -1)
+            {
+                std::perror("smash error: close failed");
+                return;
+            }
+
+            dupStdOut = -1;
+            isFailed = true;
+            std::perror("smash error: open failed");
+            return;
+        }
+    }
+    else
+    {
+        currentFD = open(destination.c_str(), O_CREAT|O_RDWR|O_TRUNC, 0655);
+        if(currentFD == -1)
+        {
+
+            if(dup2(dupStdOut, 1) == -1)
+            {
+                std::perror("smash error: dup2 failed");
+                return;
+            }
+
+            if(close(dupStdOut) == -1)
+            {
+                std::perror("smash error: close failed");
+                return;
+            }
+
+            dupStdOut = -1;
+            isFailed = true;
+            std::perror("smash error: open failed");
+            return;
+        }
+    }
+
+    if(dup(currentFD) == -1)
+    {
+        cleanup();
+        isFailed = true;
+        std::perror("smash error: dup failed");
+        return;
+    }
+
+    isFailed = false;
+}
+
+void RedirectionCommand::cleanup()
+{
+    if (close(1) == -1) //try closing 2-3
+    {
+        std::perror("smash error: close failed");
+        return;
+    }
+
+    if (dup2(dupStdOut, 1) == -1)
+    {
+        std::perror("smash error: dup2 failed");
+        return;
+    }
+
+    if (close(dupStdOut) == -1)
+    {
+        std::perror("smash error: close failed");
+        return;
+    }
+
+    dupStdOut = -1;
+}
+
+void RedirectionCommand::execute()
+{
+    prepare();
+
+    if (isFailed)
+    {
+        return;
+    }
+
+    SmallShell& shell = SmallShell::getInstance();
+    shell.executeCommand(this->currentCmd.c_str());
+    cleanup();
+
+}
+
+
 void JobsCommand::execute()
 {
     jobs->removeFinishedJobs();
@@ -722,10 +884,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new QuitCommand(cmd_line, &this->jobs);
     }
 
-
-
-
-
+    else if(cmd_s.find('>') != -1)
+    {
+        return new RedirectionCommand(cmd_line);
+    }
 
 
     else

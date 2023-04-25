@@ -12,7 +12,7 @@ public:
     const char* cmd_line;
     char** argv;
     int argc;
-    Command(const char* cmd_line) : cmd_line(cmd_line){}
+    Command(const char* cmd_line);
     virtual ~Command(){delete[] argv;}
     virtual void execute() = 0;
     //virtual void prepare();

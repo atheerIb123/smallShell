@@ -851,7 +851,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-    if (firstWord.compare("chprompt") == 0)
+    if(cmd_s.find('>') != -1)
+    {
+        return new RedirectionCommand(cmd_line);
+    }
+    else if (firstWord.compare("chprompt") == 0)
     {
         return new ChangePromptCommand(cmd_line);
     }
@@ -884,10 +888,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new QuitCommand(cmd_line, &this->jobs);
     }
 
-    else if(cmd_s.find('>') != -1)
-    {
-        return new RedirectionCommand(cmd_line);
-    }
+
 
 
     else

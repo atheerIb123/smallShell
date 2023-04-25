@@ -9,10 +9,10 @@
 class Command {
     // TODO: Add your data members
 public:
-    const char* cmd_line;
+    std::string cmdLine;
     char** argv;
     int argc;
-    Command(const char* cmd_line) : cmd_line(cmd_line) {}
+    Command(const char* cmd_line);
     virtual ~Command() { delete[] argv; }
     virtual void execute() = 0;
     //virtual void prepare();
@@ -129,7 +129,7 @@ public:
         Command* command;
 
         JobEntry(int jobID, pid_t pid, bool isStopped, Command* cmd) : job_id(jobID), pid(pid), elapsed_time(time(nullptr)), is_stopped(isStopped), command(cmd) {}
-        JobEntry& operator=(const JobEntry& job_entry) = default;
+        JobEntry& operator=(const JobEntry& job_entry);
         JobEntry(const JobEntry& other) = default;
         ~JobEntry() = default;
 

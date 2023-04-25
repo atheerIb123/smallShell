@@ -47,12 +47,20 @@ public:
 
 class RedirectionCommand : public Command {
     // TODO: Add your data members
+private:
+    std::string destination;
+    std::string currentCmd;
+    bool isFailed;
+    bool isAppend;
+    int dupStdOut;
+    void getData(std::string cmd_line);
+
 public:
-    explicit RedirectionCommand(const char* cmd_line);
+    explicit RedirectionCommand(const char* cmd_line): Command(cmd_line), dupStdOut(-1){}
     virtual ~RedirectionCommand() {}
     void execute() override;
-    //void prepare() override;
-    //void cleanup() override;
+    void prepare();
+    void cleanup();
 };
 
 

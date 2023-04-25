@@ -37,11 +37,16 @@ public:
     void execute() override;
 };
 
+enum pipeType{stdErr, stdIn};
 class PipeCommand : public Command {
-    // TODO: Add your data members
+private:
+    pipeType type;
+    std::string command1;
+    std::string command2;
 public:
-    PipeCommand(const char* cmd_line);
+    PipeCommand(const char* cmd_line, pipeType type): Command(cmd_line), type(type){}
     virtual ~PipeCommand() {}
+    void prepare();
     void execute() override;
 };
 
@@ -187,35 +192,73 @@ public:
     void execute() override;
 };
 
+class TimedEntry {
+private:
+    std::string command;
+    pid_t pid;
+    time_t start_time;
+    time_t end_time;
+    int timer;
+    bool is_foreground;
+    bool is_killed;
+
+public:
+    TimedEntry(std::string cmd, pid_t pid, time_t start_time, int timer, bool is_fg) : command(cmd), pid(pid), start_time(start_time),
+                                                                                       end_time(start_time + timer), timer(timer), is_foreground(is_fg), is_killed(false) {}
+    ~TimedEntry() = default;
+    time_t getEndTime() { return end_time; }
+    pid_t getPid() { return pid; }
+    pid_t setPid(pid_t id) { pid = id; }
+    int getTimer() { return timer; }
+    std::string getCommandLine() { return command; }
+};
+
+class TimedJobs {
+public:
+    std::vector<TimedEntry*> timeouts;
+
+    TimedJobs() = default;
+    ~TimedJobs() = default;
+
+    static bool timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2);
+
+    void removeKilledJobs();
+    void modifyJobByID(pid_t job_pid);
+};
+
+enum TimeOutErrorType {SUCCESS, TOO_FEW_ARGS, TIMEOUT_NUMBER_IS_NOT_INTEGER};
+
 class TimeoutCommand : public BuiltInCommand {
     /* Bonus */
-    // TODO: Add your data members
+    int timer;
+    TimeOutErrorType error_type;
+    std::string command;
+
+    void getDataFromTimeOutCommand(const char* cmd);
 public:
-    explicit TimeoutCommand(const char* cmd_line);
+    explicit TimeoutCommand(const char* cmd_line): BuiltInCommand(cmd_line), timer(0), error_type(SUCCESS){}
     virtual ~TimeoutCommand() {}
     void execute() override;
 };
 
+
 class ChmodCommand : public BuiltInCommand {
-    // TODO: Add your data members
 public:
-    ChmodCommand(const char* cmd_line);
+    ChmodCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
     virtual ~ChmodCommand() {}
     void execute() override;
 };
 
 class GetFileTypeCommand : public BuiltInCommand {
-    // TODO: Add your data members
 public:
-    GetFileTypeCommand(const char* cmd_line);
+    GetFileTypeCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~GetFileTypeCommand() {}
     void execute() override;
 };
 
 class SetcoreCommand : public BuiltInCommand {
-    // TODO: Add your data members
 public:
-    SetcoreCommand(const char* cmd_line);
+    SetcoreCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
     virtual ~SetcoreCommand() {}
     void execute() override;
 };
@@ -235,7 +278,7 @@ class SmallShell {
 private:
     pid_t smashPID; //for showPID
     pid_t currentJobPID;
-
+    bool isAlarmedHandling;
     std::string prompt; //for chprompt
     std::string currentCommandLine;
     SmallShell();
@@ -278,8 +321,12 @@ public:
     }
 
     void executeCommand(const char* cmd_line);
+    bool isAlarmedJobs() { return isAlarmedHandling; }
+    void setAlarmedJobs(bool is_alarmed) {isAlarmedHandling= is_alarmed; }
+
     char** last_dir_path; //for CD
     JobsList jobs;
+    TimedJobs* timed_jobs;
 };
 
 #endif //SMASH_COMMAND_H_

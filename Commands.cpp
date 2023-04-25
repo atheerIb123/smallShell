@@ -4,6 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <iomanip>
 #include "Commands.h"
 #include <fcntl.h>
@@ -57,7 +58,7 @@ string _trim(const std::string& s)
 
 int _parseCommandLine(const char* cmd_line, char** args) {
     FUNC_ENTRY()
-        int i = 0;
+    int i = 0;
     std::istringstream iss(_trim(string(cmd_line)).c_str());
     for (std::string s; iss >> s; ) {
         args[i] = (char*)malloc(s.length() + 1);
@@ -95,7 +96,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 Command::Command(const char* cmd_line) :cmdLine(std::string(cmd_line))
 {
     argv = new char* [COMMAND_MAX_ARGS + 1];
@@ -258,7 +259,7 @@ void ForegroundCommand::execute()
 
     if (waitpid(job->pid, &status, WUNTRACED) == -1)
     {
-    std:perror("smash error: waitpid failed");
+        std:perror("smash error: waitpid failed");
         return;
     }
 }
@@ -521,6 +522,147 @@ void ExternalCommand::execute()
     }
 }
 
+void TimedJobs::removeKilledJobs()
+{
+    SmallShell& shell = SmallShell::getInstance();
+    pid_t pid_smash = getpid();
+
+    if(pid_smash != shell.getSmashPID())
+    {
+        return;
+    }
+
+    for (unsigned int i = 0; i < shell.timed_jobs->timeouts.size(); i++)
+    {
+        TimedEntry* timedEntry = shell.timed_jobs->timeouts[i];
+        time_t curr_time = time(nullptr);
+
+        if (timedEntry->getEndTime() <= curr_time)
+        {
+            delete shell.timed_jobs->timeouts[i];
+            shell.timed_jobs->timeouts.erase(shell.timed_jobs->timeouts.begin() + i);
+        }
+    }
+    shell.jobs.finishedJobs();
+}
+
+void TimedJobs::modifyJobByID(pid_t job_pid)
+{
+    int timed_jobs_number = timeouts.size();
+    if (timed_jobs_number >= 1) {
+
+        timeouts[timed_jobs_number -1]->setPid(job_pid);
+    }
+    else
+    {
+        timeouts[timed_jobs_number]->setPid(job_pid);
+    }
+
+    std::sort(timeouts.begin(), timeouts.end(), timeoutEntryIsBigger);
+}
+
+void TimeoutCommand::getDataFromTimeOutCommand(const char *cmd)
+{
+    if (!cmd) {
+        return;
+    }
+
+    if (argc < 3)
+    {
+        error_type = TOO_FEW_ARGS;
+        return;
+    }
+
+    std::string timeoutDuration = string(argv[1]);
+
+    for (unsigned int index = 0; index < timeoutDuration.size(); index++)
+    {
+        if (timeoutDuration[index] < '0' || timeoutDuration[index] > '9')
+        {
+            error_type = TIMEOUT_NUMBER_IS_NOT_INTEGER;
+            return;
+        }
+    }
+
+    timer = atoi(argv[1]);
+    string cmd_temp;
+
+    for (int i = 2; i < argc; i++)
+    {
+        cmd_temp += argv[i];
+        cmd_temp += " ";
+    }
+
+    command = _trim(cmd_temp);
+}
+
+void TimeoutCommand::execute()
+{
+    this->getDataFromTimeOutCommand(this->cmdLine.c_str());
+
+    if (error_type == TIMEOUT_NUMBER_IS_NOT_INTEGER || error_type == TOO_FEW_ARGS)
+    {
+        std::cerr << "smash error: timeout: invalid arguments" << std::endl;
+        return;
+    }
+
+    SmallShell& shell = SmallShell::getInstance();
+    TimedEntry* current_timed_out = new TimedEntry(command, -1, time(nullptr), timer, false);
+
+    shell.timed_jobs->timeouts.push_back(current_timed_out);
+    shell.setAlarmedJobs(true);
+
+    char fgCommand[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(fgCommand,command.c_str());
+    _removeBackgroundSign(fgCommand);
+
+    bool is_bg = _isBackgroundComamnd(this->command.c_str());
+    pid_t pid = fork();
+
+    if(pid < 0)
+    {
+        std::perror("smash error: fork failed");
+        return;
+    }
+    else if(pid == 0)
+    {
+        setpgrp();
+        shell.executeCommand(fgCommand);
+        while(wait(nullptr) != -1) {}
+        exit(0);
+    }
+    else
+    {
+        if(shell.getSmashPID() == getpid())
+        {
+            shell.setAlarmedJobs(true);
+            shell.timed_jobs->modifyJobByID(pid);
+
+            time_t current_time = time(nullptr);
+            TimedEntry* alarm_entry = shell.timed_jobs->timeouts[0];
+            time_t end_time = alarm_entry->getEndTime();
+
+            unsigned int seconds = end_time - current_time;
+            alarm(seconds);
+
+            if (is_bg)
+            {
+                TimeoutCommand* copy_command = new TimeoutCommand(*this);
+                shell.jobs.addJob(copy_command, pid, false);
+            }
+            else
+            {
+                if(waitpid(pid, nullptr,WUNTRACED) == -1)
+                {
+                    std::perror("smash error: waitpid failed");
+                    return;
+                }
+            }
+            shell.setAlarmedJobs(false);
+        }
+    }
+    shell.setAlarmedJobs(false);
+}
 
 void RedirectionCommand::getData(std::string cmd) {
     if (cmd.empty())
@@ -683,11 +825,271 @@ void RedirectionCommand::execute()
 
 }
 
+void PipeCommand::prepare()
+{
+    size_t pipe_index = string(cmdLine).find('|');
+
+    if (type == stdErr)
+    {
+        pipe_index = string(this->cmdLine).find("|&");
+    }
+
+    string cmd_splitted1 = string(cmdLine);
+    string cmd_splitted2 = string(cmdLine);
+
+    command1 = cmd_splitted1.substr(0, pipe_index);
+    pipe_index++;
+    if (type == stdErr)
+    {
+        pipe_index++;
+    }
+
+    string str_temp = cmd_splitted2.substr(pipe_index, cmd_splitted1.length() - pipe_index);
+    str_temp= _trim(str_temp);
+    str_temp += " ";
+    command2 = str_temp.substr(0, str_temp.find_last_of(WHITESPACE));
+}
+
+void PipeCommand::execute()
+{
+    prepare();
+    SmallShell& shell = SmallShell::getInstance();
+    int fd_pipe[2];
+
+    if(pipe(fd_pipe) == -1)
+    {
+        std::perror("smash error: pipe failed");
+        return;
+    }
+
+    pid_t firstChild_pid = fork();
+
+    if(firstChild_pid == -1)
+    {
+        std::perror("smash error: fork failed");
+        return;
+    }
+
+    if(firstChild_pid == 0)
+    {
+        if(setpgrp() == -1)
+        {
+            std::perror("smash error: setpgrp failed");
+            return;
+        }
+
+        if (type == stdIn)
+        {
+            if (dup2(fd_pipe[1], 1) == -1) {
+                std::perror("smash error: dup2 failed");
+                return;
+            }
+
+            if (close(fd_pipe[0]) == -1) {
+                std::perror("smash error: close failed");
+                return;
+            }
+
+            if (close(fd_pipe[1]) == -1) {
+                std::perror("smash error: close failed");
+                return;
+            }
+        }
+        else
+        {
+            if (dup2(fd_pipe[1], 2) == -1)
+            {
+                std::perror("smash error: dup2 failed");
+                return;
+            }
+
+            if (close(fd_pipe[0])==-1)
+            {
+                std::perror("smash error: close failed");
+                return;
+            }
+
+            if (close(fd_pipe[1])==-1)
+            {
+                std::perror("smash error: close failed");
+                return;
+            }
+        }
+
+        Command* pipe_command = shell.CreateCommand(this->command1.c_str());
+        pipe_command->execute();
+        exit(0);
+    }
+
+    pid_t secondChild_pid = fork();
+
+    if(secondChild_pid == -1)
+    {
+        std::perror("smash error: fork failed");
+        return;
+    }
+
+    if(secondChild_pid == 0)
+    {
+        if (setpgrp() == -1)
+        {
+            std::perror("smash error: setpgrp failed");
+            return;
+        }
+
+        if (dup2(fd_pipe[0], 0) == -1)
+        {
+            std::perror("smash error: dup2 failed");
+            return;
+        }
+
+        if (close(fd_pipe[0]) == -1)
+        {
+            std::perror("smash error: close failed");
+            return;
+        }
+
+        if (close(fd_pipe[1]) == -1)
+        {
+            std::perror("smash error: close failed");
+            return;
+        }
+
+        Command *my_command = shell.CreateCommand(command2.c_str());
+        my_command->execute();
+        exit(0);
+    }
+
+    if (close(fd_pipe[0]) == -1) {
+        std::perror("smash error: close failed");
+        return;
+    }
+
+    if (close(fd_pipe[1]) == -1) {
+        std::perror("smash error: close failed");
+        return;
+    }
+
+    if (waitpid(firstChild_pid, nullptr, WUNTRACED) == -1)
+    {
+        std::perror("smash error: waitpid failed");
+        return;
+    }
+
+    if(waitpid(secondChild_pid, nullptr, WUNTRACED) == -1)
+    {
+        std::perror("smash error: waitpid failed");
+        return;
+    }
+}
 
 void JobsCommand::execute()
 {
     jobs->removeFinishedJobs();
     jobs->printJobsList();
+}
+
+void SetcoreCommand::execute()
+{
+    if(argc != 3 || !stoi(argv[1]) || !stoi(argv[2]))
+    {
+        std::cerr << "smash error: setcore: invalid arguments" << std::endl;
+        return;
+    }
+
+    SmallShell& shell = SmallShell::getInstance();
+    try
+    {
+        JobsList::JobEntry* job = shell.jobs.getJobById(stoi(argv[1]));
+
+        if (!job)
+        {
+            std::cerr << "smash error: setcore: job-id " << argv[1] << " does not exist" << std::endl;
+            return;
+        }
+
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        CPU_SET(stoi(argv[2]), &mask);
+
+        if (sched_setaffinity(job->job_id, sizeof(mask), &mask) == -1)
+        {
+            cerr<<"smash error: setcore: invalid core number"<<"\r\n";
+            return;
+        }
+    }
+    catch(exception &e)
+    {
+        std::cerr << "smash error: setcore: invalid arguments" << "\r\n";
+        return;
+    }
+}
+
+void GetFileTypeCommand::execute()
+{
+    if (argc != 2)
+    {
+        std::cerr << "smash error: gettype: invalid aruments" << std::endl;
+        return;
+    }
+
+    struct stat file_stats;
+    const char* filename = argv[1];
+
+    if (stat(filename, &file_stats) == 0)
+    {
+        if (file_stats.st_mode & S_IFDIR)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "directory" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+        else if (file_stats.st_mode & S_IFREG)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "regular file" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+        else if (file_stats.st_mode & S_IFCHR)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "character file" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+        else if (file_stats.st_mode & S_IFIFO)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "FIFO" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+        else if (file_stats.st_mode & S_IFBLK)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "block device" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+        else if (file_stats.st_mode & S_IFLNK)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "symbolic link" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+        else if (file_stats.st_mode & S_ISSOCK)
+        {
+            std::cout << argv[1] << "'s type is " << '"' << "socket" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
+        }
+    }
+    else
+    {
+        std::cerr << "smash error: gettype: invalid aruments" << std::endl;
+        return;
+    }
+}
+
+void ChmodCommand::execute()
+{
+    if (argc != 3)
+    {
+        std::cerr << "smash error: chmod: invalid aruments" << std::endl;
+        return;
+    }
+
+    int modeInt = stoi(argv[1]);
+    mode_t mode = static_cast<mode_t>(modeInt);
+
+    if(chmod(argv[2], mode) != 0)
+    {
+        std::cerr << "smash error: chmod: invalid aruments" << std::endl;
+        return;
+    }
 }
 
 void JobsList::addJob(Command* cmd, pid_t pid, bool isStopped)
@@ -705,11 +1107,11 @@ void JobsList::printJobsList() {
     for (JobEntry* job : jobs) {
         if (job->is_stopped) {
             std::cout << "[" << job->job_id << "] " << job->command->cmdLine << " : " << job->pid << " " <<
-                (int)difftime(time(nullptr), job->elapsed_time) << " secs (stopped)" << std::endl;
+                      (int)difftime(time(nullptr), job->elapsed_time) << " secs (stopped)" << std::endl;
         }
         else {
             std::cout << "[" << job->job_id << "] " << job->command->cmdLine << " : " << job->pid << " " <<
-                (int)difftime(time(nullptr), job->elapsed_time) << " secs" << std::endl;
+                      (int)difftime(time(nullptr), job->elapsed_time) << " secs" << std::endl;
         }
     }
 }
@@ -870,6 +1272,14 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new RedirectionCommand(cmd_line);
     }
+    else if (cmd_s.find("|&") != -1)
+    {
+        return new PipeCommand(cmd_line, stdErr);
+    }
+    else if (cmd_s.find('|') != -1)
+    {
+        return new PipeCommand(cmd_line, stdIn);
+    }
     else if (firstWord.compare("chprompt") == 0)
     {
         return new ChangePromptCommand(cmd_line);
@@ -906,7 +1316,18 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new KillCommand(cmd_line, &this->jobs);
     }
-
+    else if (firstWord == "setcore")
+    {
+        return new SetcoreCommand(cmd_line);
+    }
+    else if (firstWord == "getfiletype")
+    {
+        return new GetFileTypeCommand(cmd_line);
+    }
+    else if (firstWord == "chmod")
+    {
+        return new ChmodCommand(cmd_line);
+    }
     else
     {
         bool isBg = _isBackgroundComamnd(cmd_line);

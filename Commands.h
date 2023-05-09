@@ -220,7 +220,7 @@ public:
     TimedJobs() = default;
     ~TimedJobs() = default;
 
-    static bool timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2);
+    bool timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2);
 
     void removeKilledJobs();
     void modifyJobByID(pid_t job_pid);

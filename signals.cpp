@@ -2,12 +2,13 @@
 #include <signal.h>
 #include "signals.h"
 #include "Commands.h"
+#include <unistd.h>
 
 using namespace std;
 
 void ctrlZHandler(int sig_num)
 {
-	SmallShell& shell = SmallShell::getInstance();
+    SmallShell& shell = SmallShell::getInstance();
     std::cout << "smash: got ctrl-Z" << std::endl;
 
     if(shell.getCurrentJobPID() != -1)
@@ -97,4 +98,3 @@ void alarmHandler(int sig_num)
 
     alarm(curr_alarm-time(nullptr));
 }
-

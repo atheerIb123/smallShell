@@ -58,7 +58,7 @@ string _trim(const std::string& s)
 
 int _parseCommandLine(const char* cmd_line, char** args) {
     FUNC_ENTRY()
-    int i = 0;
+        int i = 0;
     std::istringstream iss(_trim(string(cmd_line)).c_str());
     for (std::string s; iss >> s; ) {
         args[i] = (char*)malloc(s.length() + 1);
@@ -259,7 +259,7 @@ void ForegroundCommand::execute()
 
     if (waitpid(job->pid, &status, WUNTRACED) == -1)
     {
-        std:perror("smash error: waitpid failed");
+        std::perror("smash error: waitpid failed");
         return;
     }
 }
@@ -267,7 +267,6 @@ void ForegroundCommand::execute()
 void BackgroundCommand::execute()
 {
     this->backgroundJobs->removeFinishedJobs();
-    SmallShell& shell = SmallShell::getInstance();
     int jobId;
 
     if (argc > 2)
@@ -522,12 +521,20 @@ void ExternalCommand::execute()
     }
 }
 
+bool TimedJobs::timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2)
+{
+    if ((t1->getEndTime()) >= (t2->getEndTime())) {
+        return false;
+    }
+    return true;
+}
+
 void TimedJobs::removeKilledJobs()
 {
     SmallShell& shell = SmallShell::getInstance();
     pid_t pid_smash = getpid();
 
-    if(pid_smash != shell.getSmashPID())
+    if (pid_smash != shell.getSmashPID())
     {
         return;
     }
@@ -551,7 +558,7 @@ void TimedJobs::modifyJobByID(pid_t job_pid)
     int timed_jobs_number = timeouts.size();
     if (timed_jobs_number >= 1) {
 
-        timeouts[timed_jobs_number -1]->setPid(job_pid);
+        timeouts[timed_jobs_number - 1]->setPid(job_pid);
     }
     else
     {
@@ -561,7 +568,7 @@ void TimedJobs::modifyJobByID(pid_t job_pid)
     std::sort(timeouts.begin(), timeouts.end(), timeoutEntryIsBigger);
 }
 
-void TimeoutCommand::getDataFromTimeOutCommand(const char *cmd)
+void TimeoutCommand::getDataFromTimeOutCommand(const char* cmd)
 {
     if (!cmd) {
         return;
@@ -613,27 +620,27 @@ void TimeoutCommand::execute()
     shell.setAlarmedJobs(true);
 
     char fgCommand[COMMAND_ARGS_MAX_LENGTH];
-    strcpy(fgCommand,command.c_str());
+    strcpy(fgCommand, command.c_str());
     _removeBackgroundSign(fgCommand);
 
     bool is_bg = _isBackgroundComamnd(this->command.c_str());
     pid_t pid = fork();
 
-    if(pid < 0)
+    if (pid < 0)
     {
         std::perror("smash error: fork failed");
         return;
     }
-    else if(pid == 0)
+    else if (pid == 0)
     {
         setpgrp();
         shell.executeCommand(fgCommand);
-        while(wait(nullptr) != -1) {}
+        while (wait(nullptr) != -1) {}
         exit(0);
     }
     else
     {
-        if(shell.getSmashPID() == getpid())
+        if (shell.getSmashPID() == getpid())
         {
             shell.setAlarmedJobs(true);
             shell.timed_jobs->modifyJobByID(pid);
@@ -652,7 +659,7 @@ void TimeoutCommand::execute()
             }
             else
             {
-                if(waitpid(pid, nullptr,WUNTRACED) == -1)
+                if (waitpid(pid, nullptr, WUNTRACED) == -1)
                 {
                     std::perror("smash error: waitpid failed");
                     return;
@@ -665,12 +672,13 @@ void TimeoutCommand::execute()
 }
 
 void RedirectionCommand::getData(std::string cmd) {
+
     if (cmd.empty())
     {
         return;
     }
 
-    if (cmd.find(">>") != -1)
+    if (cmd.find(">>") != std::string::npos)
     {
         isAppend = true;
     }
@@ -845,7 +853,7 @@ void PipeCommand::prepare()
     }
 
     string str_temp = cmd_splitted2.substr(pipe_index, cmd_splitted1.length() - pipe_index);
-    str_temp= _trim(str_temp);
+    str_temp = _trim(str_temp);
     str_temp += " ";
     command2 = str_temp.substr(0, str_temp.find_last_of(WHITESPACE));
 }
@@ -856,7 +864,7 @@ void PipeCommand::execute()
     SmallShell& shell = SmallShell::getInstance();
     int fd_pipe[2];
 
-    if(pipe(fd_pipe) == -1)
+    if (pipe(fd_pipe) == -1)
     {
         std::perror("smash error: pipe failed");
         return;
@@ -864,15 +872,15 @@ void PipeCommand::execute()
 
     pid_t firstChild_pid = fork();
 
-    if(firstChild_pid == -1)
+    if (firstChild_pid == -1)
     {
         std::perror("smash error: fork failed");
         return;
     }
 
-    if(firstChild_pid == 0)
+    if (firstChild_pid == 0)
     {
-        if(setpgrp() == -1)
+        if (setpgrp() == -1)
         {
             std::perror("smash error: setpgrp failed");
             return;
@@ -903,13 +911,13 @@ void PipeCommand::execute()
                 return;
             }
 
-            if (close(fd_pipe[0])==-1)
+            if (close(fd_pipe[0]) == -1)
             {
                 std::perror("smash error: close failed");
                 return;
             }
 
-            if (close(fd_pipe[1])==-1)
+            if (close(fd_pipe[1]) == -1)
             {
                 std::perror("smash error: close failed");
                 return;
@@ -923,13 +931,13 @@ void PipeCommand::execute()
 
     pid_t secondChild_pid = fork();
 
-    if(secondChild_pid == -1)
+    if (secondChild_pid == -1)
     {
         std::perror("smash error: fork failed");
         return;
     }
 
-    if(secondChild_pid == 0)
+    if (secondChild_pid == 0)
     {
         if (setpgrp() == -1)
         {
@@ -955,7 +963,7 @@ void PipeCommand::execute()
             return;
         }
 
-        Command *my_command = shell.CreateCommand(command2.c_str());
+        Command* my_command = shell.CreateCommand(command2.c_str());
         my_command->execute();
         exit(0);
     }
@@ -976,7 +984,7 @@ void PipeCommand::execute()
         return;
     }
 
-    if(waitpid(secondChild_pid, nullptr, WUNTRACED) == -1)
+    if (waitpid(secondChild_pid, nullptr, WUNTRACED) == -1)
     {
         std::perror("smash error: waitpid failed");
         return;
@@ -991,7 +999,7 @@ void JobsCommand::execute()
 
 void SetcoreCommand::execute()
 {
-    if(argc != 3 || !stoi(argv[1]) || !stoi(argv[2]))
+    if (argc != 3 || !stoi(argv[1]) || !stoi(argv[2]))
     {
         std::cerr << "smash error: setcore: invalid arguments" << std::endl;
         return;
@@ -1014,11 +1022,11 @@ void SetcoreCommand::execute()
 
         if (sched_setaffinity(job->job_id, sizeof(mask), &mask) == -1)
         {
-            cerr<<"smash error: setcore: invalid core number"<<"\r\n";
+            cerr << "smash error: setcore: invalid core number" << "\r\n";
             return;
         }
     }
-    catch(exception &e)
+    catch (exception& e)
     {
         std::cerr << "smash error: setcore: invalid arguments" << "\r\n";
         return;
@@ -1062,7 +1070,7 @@ void GetFileTypeCommand::execute()
         {
             std::cout << argv[1] << "'s type is " << '"' << "symbolic link" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
         }
-        else if (file_stats.st_mode & S_ISSOCK)
+        else if (file_stats.st_mode & S_IFSOCK)
         {
             std::cout << argv[1] << "'s type is " << '"' << "socket" << '"' << " and takes up " << file_stats.st_size << " bytes" << std::endl;
         }
@@ -1085,7 +1093,7 @@ void ChmodCommand::execute()
     int modeInt = stoi(argv[1]);
     mode_t mode = static_cast<mode_t>(modeInt);
 
-    if(chmod(argv[2], mode) != 0)
+    if (chmod(argv[2], mode) != 0)
     {
         std::cerr << "smash error: chmod: invalid aruments" << std::endl;
         return;
@@ -1107,11 +1115,11 @@ void JobsList::printJobsList() {
     for (JobEntry* job : jobs) {
         if (job->is_stopped) {
             std::cout << "[" << job->job_id << "] " << job->command->cmdLine << " : " << job->pid << " " <<
-                      (int)difftime(time(nullptr), job->elapsed_time) << " secs (stopped)" << std::endl;
+                (int)difftime(time(nullptr), job->elapsed_time) << " secs (stopped)" << std::endl;
         }
         else {
             std::cout << "[" << job->job_id << "] " << job->command->cmdLine << " : " << job->pid << " " <<
-                      (int)difftime(time(nullptr), job->elapsed_time) << " secs" << std::endl;
+                (int)difftime(time(nullptr), job->elapsed_time) << " secs" << std::endl;
         }
     }
 }
@@ -1227,7 +1235,7 @@ JobsList::JobEntry* JobsList::getLastJob(int* lastJobId) {
 }
 
 JobsList::JobEntry* JobsList::getLastStoppedJob(int* jobId) {
-    int index = 0, maxID = 0;
+    int maxID = 0;
     JobEntry* lastStoppedJob = nullptr;
 
     for (JobEntry* job : jobs) {
@@ -1268,15 +1276,15 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-    if (cmd_s.find('>') != -1)
+    if (cmd_s.find('>') != string::npos)
     {
         return new RedirectionCommand(cmd_line);
     }
-    else if (cmd_s.find("|&") != -1)
+    else if (cmd_s.find("|&") != string::npos)
     {
         return new PipeCommand(cmd_line, stdErr);
     }
-    else if (cmd_s.find('|') != -1)
+    else if (cmd_s.find('|') != string::npos)
     {
         return new PipeCommand(cmd_line, stdIn);
     }

@@ -327,9 +327,9 @@ void BackgroundCommand::execute()
 
 void QuitCommand::execute()
 {
-    std::string arg = argv[1];
-    if (arg == "kill")
+    if (argv[1] == "kill")
     {
+        jobs->removeFinishedJobs();
         std::cout << "smash: sending SIGKILL signal to " << jobs->getJobs().size() << " jobs:" << std::endl;
 
         for (JobsList::JobEntry* job : jobs->getJobs())
@@ -521,13 +521,6 @@ void ExternalCommand::execute()
     }
 }
 
-bool TimedJobs::timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2)
-{
-    if ((t1->getEndTime()) >= (t2->getEndTime())) {
-        return false;
-    }
-    return true;
-}
 
 void TimedJobs::removeKilledJobs()
 {
@@ -1126,14 +1119,11 @@ void JobsList::printJobsList() {
 
 void JobsList::removeFinishedJobs()
 {
-    int index = 0;
-
     for (JobEntry* job : jobs) {
         int waitResult = waitpid(job->pid, nullptr, WNOHANG);
         if (waitResult != 0) {
-            jobs.erase(jobs.begin() + index);
+            jobs.erase(jobs.begin());
         }
-        index++;
     }
 }
 
@@ -1288,51 +1278,51 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new PipeCommand(cmd_line, stdIn);
     }
-    else if (firstWord.compare("chprompt") == 0)
+    else if (firstWord.compare("chprompt") == 0 || firstWord == "chprompt&")
     {
         return new ChangePromptCommand(cmd_line);
     }
-    else if (firstWord == "showpid")
+    else if (firstWord == "showpid" || firstWord == "showpid&")
     {
         return new ShowPidCommand(cmd_line);
     }
-    else if (firstWord == "pwd")
+    else if (firstWord == "pwd" || firstWord == "pwd&")
     {
         return new GetCurrDirCommand(cmd_line);
     }
-    else if (firstWord == "cd")
+    else if (firstWord == "cd" || firstWord == "cd&")
     {
         return new ChangeDirCommand(cmd_line, last_dir_path);
     }
-    else if (firstWord == "jobs")
+    else if (firstWord == "jobs" || firstWord == "jobs&")
     {
         return new JobsCommand(cmd_line, &jobs);
     }
-    else if (firstWord == "fg")
+    else if (firstWord == "fg" || firstWord == "fg&")
     {
         return new ForegroundCommand(cmd_line, &this->jobs);
     }
-    else if (firstWord == "bg")
+    else if (firstWord == "bg" || firstWord == "bg&")
     {
         return new BackgroundCommand(cmd_line, &this->jobs);
     }
-    else if (firstWord == "quit")
+    else if (firstWord == "quit" || firstWord == "quit&")
     {
         return new QuitCommand(cmd_line, &this->jobs);
     }
-    else if (firstWord == "kill")
+    else if (firstWord == "kill" || firstWord == "kill&")
     {
         return new KillCommand(cmd_line, &this->jobs);
     }
-    else if (firstWord == "setcore")
+    else if (firstWord == "setcore" || firstWord == "setcore&")
     {
         return new SetcoreCommand(cmd_line);
     }
-    else if (firstWord == "getfiletype")
+    else if (firstWord == "getfiletype" || firstWord == "getfiletype&")
     {
         return new GetFileTypeCommand(cmd_line);
     }
-    else if (firstWord == "chmod")
+    else if (firstWord == "chmod" || firstWord == "chmod&")
     {
         return new ChmodCommand(cmd_line);
     }

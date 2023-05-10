@@ -117,7 +117,7 @@ class QuitCommand : public BuiltInCommand {
 private:
     JobsList* jobs;
 public:
-    QuitCommand(const char* cmd_line, JobsList* jobs) :BuiltInCommand(cmd_line), jobs(jobs) {}
+    QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
     virtual ~QuitCommand() {}
     void execute() override;
 };
@@ -208,7 +208,7 @@ public:
     ~TimedEntry() = default;
     time_t getEndTime() { return end_time; }
     pid_t getPid() { return pid; }
-    pid_t setPid(pid_t id) { pid = id; }
+    void setPid(pid_t id) { pid = id; }
     int getTimer() { return timer; }
     std::string getCommandLine() { return command; }
 };
@@ -220,7 +220,14 @@ public:
     TimedJobs() = default;
     ~TimedJobs() = default;
 
-    bool timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2);
+    static bool timeoutEntryIsBigger(TimedEntry* t1, TimedEntry* t2)
+    {
+        if ((t1->getEndTime()) >= (t2->getEndTime())) {
+            return false;
+        }
+
+        return true;
+    }
 
     void removeKilledJobs();
     void modifyJobByID(pid_t job_pid);

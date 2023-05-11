@@ -1121,8 +1121,10 @@ void JobsList::removeFinishedJobs()
 {
     for (JobEntry* job : jobs) {
         int waitResult = waitpid(job->pid, nullptr, WNOHANG);
-        if (waitResult != 0) {
-            jobs.erase(jobs.begin());
+        if (waitResult != 0)
+        {
+            std::vector<JobEntry*>::iterator pos = std::find(jobs.begin(), jobs.end(), job);
+            jobs.erase(pos);
         }
     }
 }

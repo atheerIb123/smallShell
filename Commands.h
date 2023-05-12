@@ -327,6 +327,11 @@ public:
         this->currentCommandLine = cmd_line;
     }
 
+    std::string getCurrentCommandLine()
+    {
+        return this->currentCommandLine;
+    }
+
     void executeCommand(const char* cmd_line);
     bool isAlarmedJobs() { return isAlarmedHandling; }
     void setAlarmedJobs(bool is_alarmed) {isAlarmedHandling= is_alarmed; }

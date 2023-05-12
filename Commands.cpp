@@ -211,6 +211,19 @@ void ForegroundCommand::execute()
     }
     else if (argc == 2)
     {
+        for (char& c : std::string(argv[1]))
+        {
+            if (c == '-')
+            {
+                continue;
+            }
+            if(!std::isdigit(c))
+            {
+                std::cerr << "smash error: fg: invalid arguments" << std::endl;
+                return;
+            }
+        }
+
         jobId = stoi(argv[1]);
 
         if (jobId == 0)
@@ -226,7 +239,7 @@ void ForegroundCommand::execute()
         }
     }
 
-    if (foregroundJobs->getJobs().empty())
+    if (foregroundJobs->getJobs().empty() && !this->argv[1])
     {
         std::cerr << "smash error: fg: jobs list is empty" << std::endl;
         return;
@@ -239,6 +252,8 @@ void ForegroundCommand::execute()
         std::cerr << "smash error: fg: job-id " << jobId << " does not exist" << std::endl;
         return;
     }
+
+
 
     if (job->is_stopped)
     {
@@ -296,12 +311,12 @@ void BackgroundCommand::execute()
         job = backgroundJobs->getJobById(jobId);
         if (job == nullptr)
         {
-            std::cerr << "smash error: fg: job-id " << jobId << " does not exist" << std::endl;
+            std::cerr << "smash error: bg: job-id " << jobId << " does not exist" << std::endl;
             return;
         }
         if (!job->is_stopped)
         {
-            std::cerr << "smash error: bg: job-id" << jobId << "is already running in the background" << std::endl;
+            std::cerr << "smash error: bg: job-id " << jobId << " is already running in the background" << std::endl;
             return;
         }
     }
@@ -327,7 +342,7 @@ void BackgroundCommand::execute()
 
 void QuitCommand::execute()
 {
-    if (argv[1] == "kill")
+    if (argv[1] && strcmp(argv[1], "kill") == 0)
     {
         jobs->removeFinishedJobs();
         std::cout << "smash: sending SIGKILL signal to " << jobs->getJobs().size() << " jobs:" << std::endl;
@@ -357,13 +372,13 @@ void KillCommand::execute()
 
     if (!job)
     {
-        cerr << "smash error: kill: job-id " << job->job_id << " does not exist" << endl;
+        cerr << "smash error: kill: job-id " << id << " does not exist" << endl;
         return;
     }
 
     if (kill(job->pid, sigNum) == -1)
     {
-        std::perror("smash error: kill failed");
+        cerr << "smash error: kill: invalid arguments" << endl;
     }
     else
     {
@@ -429,7 +444,7 @@ bool KillCommand::validArguments()
 
     if (argv[2][0] == '-')
     {
-        cerr << "smash error: kill: job-id -" << num << " does not exist" << endl;
+        cerr << "smash error: kill: job-id " << stoi(argv[2]) << " does not exist" << endl;
         return false;
     }
 
@@ -502,12 +517,16 @@ void ExternalCommand::execute()
 
         if (!isBg)
         {
+            int status = 0;
+
             shell.setCurrentJobPID(pid);
             shell.setCurrentCommandLine(std::string(cmdLine));
 
-            if (waitpid(pid, nullptr, WUNTRACED) == -1)
+            int waitResult = waitpid(pid, &status, WUNTRACED);
+
+            if (waitResult == -1)
             {
-                std::perror("smash error: waitpid failed");
+                perror("smash error: waitpid failed");
                 return;
             }
 
@@ -1248,6 +1267,7 @@ SmallShell::SmallShell() {
     this->currentJobPID = -1;
     this->last_dir_path = new char* [FILENAME_MAX];
     *this->last_dir_path = nullptr;
+    this->timed_jobs = new TimedJobs();
 
 }
 
@@ -1328,34 +1348,22 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new ChmodCommand(cmd_line);
     }
+    else if (firstWord == "timeout")
+    {
+        return new TimeoutCommand(cmd_line);
+    }
     else
     {
         bool isBg = _isBackgroundComamnd(cmd_line);
         return new ExternalCommand(cmd_line, &jobs, isBg);
     }
-    // For example:
-/*
-  string cmd_s = _trim(string(cmd_line));
-  string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-  if (firstWord.compare("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  else if (firstWord.compare("showpid") == 0) {
-    return new ShowPidCommand(cmd_line);
-  }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
-  }
-  */
     return nullptr;
 }
 
 void SmallShell::executeCommand(const char* cmd_line) {
-    // TODO: Add your implementation here
     Command* cmd = CreateCommand(cmd_line);
+    this->currentCommandLine = cmd_line;
 
     if (cmd_line)
     {

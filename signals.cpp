@@ -28,11 +28,11 @@ void ctrlZHandler(int sig_num)
         }
         else
         {
-            Command* cmd = shell.CreateCommand(currentJob->command->cmdLine.c_str());
+            Command* cmd = shell.CreateCommand(shell.getCurrentCommandLine().c_str());
             shell.jobs.addJob(cmd, shell.getCurrentJobPID(), true);
         }
 
-        std::cout << "smash: process " << currentJob->pid << " was stopped" << std::endl;
+        std::cout << "smash: process " << shell.getCurrentJobPID() << " was stopped" << std::endl;
         shell.setCurrentJobPID(-1);
     }
 }
@@ -59,7 +59,7 @@ void ctrlCHandler(int sig_num)
             shell.jobs.removeJobById(job->job_id);
         }
 
-        std::cout << "smash: process " << job->pid << " was killed" << std::endl;
+        std::cout << "smash: process " << shell.getCurrentJobPID() << " was killed" << std::endl;
         shell.setCurrentJobPID(-1);
     }
 }

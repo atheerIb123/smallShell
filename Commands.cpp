@@ -359,6 +359,8 @@ void QuitCommand::execute()
 }
 void KillCommand::execute()
 {
+    jobs->removeFinishedJobs();
+
     if (!validArguments())
     {
         return;
@@ -534,6 +536,7 @@ void ExternalCommand::execute()
         else
         {
             ExternalCommand* exCmd = new ExternalCommand(this->cmdLine.c_str(), jobs, isBg);
+            shell.setCurrentJobPID(-1);
             jobs->addJob(exCmd, pid, false);
         }
 
@@ -1280,7 +1283,8 @@ SmallShell::~SmallShell()
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 
-Command* SmallShell::CreateCommand(const char* cmd_line) {
+Command* SmallShell::CreateCommand(const char* cmd_line)
+{
     if (!cmd_line)
     {
         return nullptr;
@@ -1361,7 +1365,10 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char* cmd_line) {
+void SmallShell::executeCommand(const char* cmd_line)
+{
+    this->jobs.removeFinishedJobs();
+
     Command* cmd = CreateCommand(cmd_line);
     this->currentCommandLine = cmd_line;
 
@@ -1370,4 +1377,5 @@ void SmallShell::executeCommand(const char* cmd_line) {
         cmd->execute();
         delete cmd;
     }
+    this->currentJobPID = -1;
 }

@@ -1,4 +1,5 @@
-SUBMITTERS := 213281470_213281470
+#TODO: replace ID with your own IDS, for example: 123456789_123456789
+SUBMITTERS := 322827239_212249064
 COMPILER := g++
 COMPILER_FLAGS := --std=c++11 -Wall
 SRCS := Commands.cpp signals.cpp smash.cpp
